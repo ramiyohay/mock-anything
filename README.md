@@ -2,11 +2,15 @@
 
 https://www.npmjs.com/package/mock-anything
 
+
 Tiny TypeScript utility to **temporarily replace a method on an object and restore it**.
 
 No test framework.  
 No module mocking.  
 No magic.
+
+Questions or issues?
+Open an issue on GitHub – happy to help.
 
 ---
 
