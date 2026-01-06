@@ -24,7 +24,6 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
 
   // pending mode (consumed by next returns / throws / resolves)
   type PendingMode = { type: "once" } | { type: "times"; count: number } | null;
-
   let pendingMode: PendingMode = null;
 
   // withArgs rules
@@ -49,13 +48,16 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
     // once (highest priority)
     if (onceImplementation) {
       const fn = onceImplementation;
+
       onceImplementation = null;
+
       return fn.apply(this, args);
     }
 
     // times
     if (timesRemaining !== null && timesRemaining > 0 && timesImplementation) {
       timesRemaining--;
+
       return timesImplementation.apply(this, args);
     }
 
@@ -85,6 +87,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
     // run once
     once() {
       pendingMode = { type: "once" };
+
       return this;
     },
 
@@ -93,7 +96,9 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
       if (!Number.isInteger(n) || n <= 0) {
         throw new Error("times(n) expects a positive integer");
       }
+
       pendingMode = { type: "times", count: n };
+
       return this;
     },
 
@@ -105,6 +110,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
             args: expectedArgs,
             impl: () => value,
           });
+
           return this;
         },
 
@@ -115,6 +121,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
               throw error;
             },
           });
+
           return this;
         },
 
@@ -123,6 +130,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
             args: expectedArgs,
             impl: () => Promise.resolve(value),
           });
+
           return this;
         },
       };
@@ -140,6 +148,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
       } else {
         implementation = () => value;
       }
+
       return this;
     },
 
@@ -149,18 +158,21 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
         onceImplementation = () => {
           throw error;
         };
+
         pendingMode = null;
       } else if (pendingMode?.type === "times") {
         timesRemaining = pendingMode.count;
         timesImplementation = () => {
           throw error;
         };
+
         pendingMode = null;
       } else {
         implementation = () => {
           throw error;
         };
       }
+
       return this;
     },
 
@@ -176,6 +188,7 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
       } else {
         implementation = () => Promise.resolve(value);
       }
+
       return this;
     },
 
