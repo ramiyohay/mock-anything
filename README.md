@@ -147,13 +147,18 @@ mock(api, "fetchUser")
 
 ```ts
 mock(target, key)
-  .returns(value)
-  .throws(error)
-  .resolves(value)
-  .once()
-  .withArgs(...args)
-  .called()
-  .restore();
+  .returns(value)        // return a value
+  .throws(error)         // throw an error
+  .resolves(value)       // resolve a promise
+  .once()                // apply behavior once
+  .times(n)              // apply behavior multiple times
+  .withArgs(...args)     // apply behavior based on arguments
+  .called()              // get call count
+  .calledArgs()          // get arguments of each call
+  .restore();            // restore the original function
+
+restoreAll();             // restore all mocks at once
+
 ```
 
 ---
