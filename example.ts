@@ -1,4 +1,4 @@
-import { mock } from "./src";
+import { mock, restoreAll } from "./src";
 
 const service = {
   getUser(id?: number) {
@@ -55,4 +55,80 @@ service.fetchUser(999).then((user) => {
   console.log("Called:", asyncMock.called()); // 3
 
   asyncMock.restore();
+});
+
+
+// =======================================================
+// =============== ADDITIONAL EXAMPLES ===================
+// =======================================================
+
+
+// ---- once(): first call behaves differently ----
+const onceMock = mock(service, "getUser")
+  .once().returns({ id: 999 })
+  .returns({ id: 1 });
+
+console.log(service.getUser()); // { id: 999 }
+console.log(service.getUser()); // { id: 1 }
+console.log(service.getUser()); // { id: 1 }
+
+onceMock.restore();
+
+
+// ---- times(): temporary behavior for N calls ----
+const timesMock = mock(service, "getUser")
+  .times(2).returns({ id: -1 })
+  .returns({ id: 1 });
+
+console.log(service.getUser()); // { id: -1 }
+console.log(service.getUser()); // { id: -1 }
+console.log(service.getUser()); // { id: 1 }
+
+timesMock.restore();
+
+
+// ---- combining once + times ----
+const combinedMock = mock(service, "getUser")
+  .once().returns({ id: 1000 })
+  .times(2).returns({ id: -1 })
+  .returns({ id: 1 });
+
+console.log(service.getUser()); // { id: 1000 } (once)
+console.log(service.getUser()); // { id: -1 }   (times)
+console.log(service.getUser()); // { id: -1 }   (times)
+console.log(service.getUser()); // { id: 1 }    (fallback)
+
+combinedMock.restore();
+
+
+// ---- calledArgs(): inspect how the function was called ----
+const argsMock = mock(service, "getUser").returns({ id: 0 });
+
+service.getUser(10);
+service.getUser(20);
+service.getUser(30);
+
+console.log(argsMock.calledArgs());
+// [[10], [20], [30]]
+
+argsMock.restore();
+
+
+// ---- restoreAll(): restore all mocks at once ----
+mock(service, "getUser").returns({ id: 123 });
+mock(service, "fetchUser").resolves({ id: 456 });
+
+console.log(service.getUser()); // { id: 123 }
+
+service.fetchUser().then((user) => {
+  console.log(user); // { id: 456 }
+
+  // restore everything
+  restoreAll();
+
+  console.log(service.getUser()); // { id: 1 }
+
+  service.fetchUser().then((u) => {
+    console.log(u); // { id: 1 }
+  });
 });

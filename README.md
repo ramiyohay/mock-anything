@@ -9,6 +9,8 @@ No test framework.
 No module mocking.  
 No magic.
 
+check **example.js** for more examples :)
+
 Questions or issues?
 Open an issue on GitHub – happy to help.
 
@@ -18,12 +20,15 @@ Open an issue on GitHub – happy to help.
 
 `mock-anything` lets you override a function **explicitly and safely**:
 
-- return a value
-- throw an error
-- resolve a promise
-- apply behavior once
-- apply behavior based on arguments
+- return values (sync)
+- throw errors
+- resolve promises (async)
+- apply behavior once (`once`)
+- apply behavior multiple times (`times`)
+- apply behavior based on arguments (`withArgs`)
+- inspect call count and arguments (`called`, `calledArgs`)
 - restore the original function
+- restore all mocks at once (`restoreAll`)
 
 Perfect for:
 - scripts
