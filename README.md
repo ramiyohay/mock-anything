@@ -158,7 +158,6 @@ mock(target, key)
   .restore();            // restore the original function
 
 restoreAll();             // restore all mocks at once
-
 ```
 
 ---
