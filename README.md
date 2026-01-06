@@ -1,5 +1,7 @@
 # mock-anything
 
+https://www.npmjs.com/package/mock-anything
+
 Tiny TypeScript utility to **temporarily replace a method on an object and restore it**.
 
 No test framework.  
