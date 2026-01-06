@@ -27,6 +27,8 @@ Open an issue on GitHub – happy to help.
 - apply behavior multiple times (`times`)
 - apply behavior based on arguments (`withArgs`)
 - inspect call count and arguments (`called`, `calledArgs`)
+- apply behavior on call index (`onCall`)
+- reset data but keeps the mock (`reset`)
 - restore the original function
 - restore all mocks at once (`restoreAll`)
 
@@ -155,6 +157,8 @@ mock(target, key)
   .withArgs(...args)     // apply behavior based on arguments
   .called()              // get call count
   .calledArgs()          // get arguments of each call
+  .reset()               // reset data but keeps the mock
+  .onCall(n)              // apply behavior based on call index
   .restore();            // restore the original function
 
 restoreAll();             // restore all mocks at once

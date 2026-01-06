@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mock, restoreAll } from "../src";
+
+afterEach(() => {
+  restoreAll();
+});
 
 describe("mock()", () => {
   describe("basic behavior", () => {
@@ -359,6 +363,178 @@ describe("mock()", () => {
 
       expect(a.fn()).toBe("a");
       expect(b.fn()).toBe("b");
+    });
+  });
+
+  describe("onCall()", () => {
+    it("applies behavior based on call order", () => {
+      const api = {
+        fn() {
+          return "default";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .onCall(1)
+        .returns("first")
+        .onCall(3)
+        .returns("third")
+        .returns("fallback");
+
+      expect(api.fn()).toBe("first"); // call #1
+      expect(api.fn()).toBe("fallback"); // call #2
+      expect(api.fn()).toBe("third"); // call #3
+      expect(api.fn()).toBe("fallback"); // call #4
+
+      expect(m.called()).toBe(4);
+    });
+
+    it("has higher priority than once and times", () => {
+      const api = {
+        fn() {
+          return "real";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .onCall(1)
+        .returns("onCall")
+        .once()
+        .returns("once")
+        .times(2)
+        .returns("times")
+        .returns("default");
+
+      expect(api.fn()).toBe("onCall"); // onCall wins
+      expect(api.fn()).toBe("once");
+      expect(api.fn()).toBe("times");
+      expect(api.fn()).toBe("times");
+      expect(api.fn()).toBe("default");
+
+      expect(m.called()).toBe(5);
+    });
+
+    it("works with throws()", () => {
+      const api = {
+        fn() {
+          return "ok";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .onCall(2)
+        .throws(new Error("boom"))
+        .returns("safe");
+
+      expect(api.fn()).toBe("safe");
+      expect(() => api.fn()).toThrow("boom");
+      expect(api.fn()).toBe("safe");
+
+      expect(m.called()).toBe(3);
+    });
+
+    it("works with resolves()", async () => {
+      const api = {
+        async fn() {
+          return "real";
+        },
+      };
+
+      const m = mock(api, "fn").onCall(1).resolves("first").resolves("next");
+
+      await expect(api.fn()).resolves.toBe("first");
+      await expect(api.fn()).resolves.toBe("next");
+
+      expect(m.called()).toBe(2);
+    });
+  });
+
+  describe("reset()", () => {
+    it("clears call count and arguments but keeps mock active", () => {
+      const api = {
+        fn(x: number) {
+          return x;
+        },
+      };
+
+      const m = mock(api, "fn").returns(10);
+
+      api.fn(1);
+      api.fn(2);
+
+      expect(m.called()).toBe(2);
+      expect(m.calledArgs()).toEqual([[1], [2]]);
+
+      m.reset();
+
+      expect(m.called()).toBe(0);
+      expect(m.calledArgs()).toEqual([]);
+
+      // still mocked
+      expect(api.fn(3)).toBe(10);
+      expect(m.called()).toBe(1);
+    });
+
+    it("resets onCall behavior", () => {
+      const api = {
+        fn() {
+          return "real";
+        },
+      };
+
+      const m = mock(api, "fn").onCall(1).returns("once").returns("default");
+
+      expect(api.fn()).toBe("once");
+      expect(api.fn()).toBe("default");
+
+      m.reset();
+
+      // onCall cleared
+      expect(api.fn()).toBe("default");
+      expect(m.called()).toBe(1);
+    });
+
+    it("resets once and times state", () => {
+      const api = {
+        fn() {
+          return "real";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .once()
+        .returns("once")
+        .times(2)
+        .returns("temp")
+        .returns("final");
+
+      expect(api.fn()).toBe("once");
+      expect(api.fn()).toBe("temp");
+
+      m.reset();
+
+      expect(api.fn()).toBe("final");
+      expect(m.called()).toBe(1);
+    });
+
+    it("does not restore original function", () => {
+      const api = {
+        fn() {
+          return "real";
+        },
+      };
+
+      const m = mock(api, "fn").returns("mocked");
+
+      expect(api.fn()).toBe("mocked");
+
+      m.reset();
+
+      // still mocked
+      expect(api.fn()).toBe("mocked");
+
+      m.restore();
+      expect(api.fn()).toBe("real");
     });
   });
 });
