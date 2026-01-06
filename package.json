@@ -1,6 +1,6 @@
 {
   "name": "mock-anything",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Tiny utility to temporarily replace a function and restore it",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
