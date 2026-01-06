@@ -537,4 +537,101 @@ describe("mock()", () => {
       expect(api.fn()).toBe("real");
     });
   });
+
+  describe("until()", () => {
+    it("applies behavior while predicate is true, then falls back", () => {
+      let ready = false;
+
+      const api = {
+        poll() {
+          return "done";
+        },
+      };
+
+      const m = mock(api, "poll")
+        .until(() => !ready)
+        .returns("pending")
+        .returns("done");
+
+      expect(api.poll()).toBe("pending");
+      expect(api.poll()).toBe("pending");
+
+      ready = true;
+
+      expect(api.poll()).toBe("done");
+      expect(api.poll()).toBe("done");
+
+      expect(m.called()).toBe(4);
+    });
+
+    it("throws when maxCalls is exceeded", () => {
+      const api = {
+        poll() {
+          return "done";
+        },
+      };
+
+      const m = mock(api, "poll")
+        .until(() => true, 2)
+        .returns("pending")
+        .returns("done");
+
+      expect(api.poll()).toBe("pending");
+      expect(api.poll()).toBe("pending");
+      expect(() => api.poll()).toThrow("until() exceeded maxCalls (2)");
+
+      expect(m.called()).toBe(3);
+    });
+
+    it("works with throws()", () => {
+      let blocked = true;
+
+      const api = {
+        fn() {
+          return "ok";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .until(() => blocked)
+        .throws(new Error("blocked"))
+        .returns("ok");
+
+      expect(() => api.fn()).toThrow("blocked");
+
+      blocked = false;
+
+      expect(api.fn()).toBe("ok");
+      expect(m.called()).toBe(2);
+    });
+
+    it("has lower priority than onCall and times", () => {
+      let pending = true;
+
+      const api = {
+        fn() {
+          return "default";
+        },
+      };
+
+      const m = mock(api, "fn")
+        .onCall(1)
+        .returns("onCall")
+        .times(2)
+        .returns("times")
+        .until(() => pending)
+        .returns("until")
+        .returns("final");
+
+      expect(api.fn()).toBe("onCall"); // onCall
+      expect(api.fn()).toBe("times"); // times
+      expect(api.fn()).toBe("times"); // times
+      expect(api.fn()).toBe("until"); // until
+
+      pending = false;
+
+      expect(api.fn()).toBe("final"); // fallback
+      expect(m.called()).toBe(5);
+    });
+  });
 });

@@ -31,6 +31,7 @@ Open an issue on GitHub – happy to help.
 - reset data but keeps the mock (`reset`)
 - restore the original function
 - restore all mocks at once (`restoreAll`)
+- conditional behavior (`until`) - **please see examples to avoid bugs or loops**
 
 Perfect for:
 - scripts
@@ -158,7 +159,8 @@ mock(target, key)
   .called()              // get call count
   .calledArgs()          // get arguments of each call
   .reset()               // reset data but keeps the mock
-  .onCall(n)              // apply behavior based on call index
+  .onCall(n)             // apply behavior based on call index
+  .until(() => bool)     // apply behavior based on a boolean condition
   .restore();            // restore the original function
 
 restoreAll();             // restore all mocks at once

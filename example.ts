@@ -204,4 +204,92 @@ service.fetchUser().then((user) => {
   console.log(resetOnCallMock.called()); // 1
 
   resetOnCallMock.restore();
+
+  // =======================================================
+  // ================== UNTIL EXAMPLES =====================
+  // =======================================================
+
+  // ---- until(): simple polling ----
+  let ready = false;
+
+  const untilMock = mock(service, "getUser")
+    .until(() => !ready)
+    .returns({ id: -1 })
+    .returns({ id: 1 });
+
+  console.log(service.getUser()); // { id: -1 }
+  console.log(service.getUser()); // { id: -1 }
+
+  ready = true;
+
+  console.log(service.getUser()); // { id: 1 }
+  console.log(service.getUser()); // { id: 1 }
+
+  untilMock.restore();
+
+  // ---- until(): with maxCalls (infinite-loop protection) ----
+  let loading = true;
+
+  const guardedUntilMock = mock(service, "getUser")
+    .until(() => loading, 2)
+    .returns({ id: 0 })
+    .returns({ id: 1 });
+
+  console.log(service.getUser()); // { id: 0 }
+  console.log(service.getUser()); // { id: 0 }
+
+  // Third call exceeds maxCalls
+  try {
+    console.log(service.getUser());
+  } catch (e: any) {
+    console.log(e.message); // until() exceeded maxCalls (2)
+  }
+
+  loading = false;
+
+  console.log(service.getUser()); // { id: 1 }
+
+  guardedUntilMock.restore();
+
+  // ---- until(): works with async + resolves ----
+  let waiting = true;
+
+  const asyncUntilMock = mock(service, "fetchUser")
+    .until(() => waiting)
+    .resolves({ id: -1 })
+    .resolves({ id: 1 });
+
+  service.fetchUser().then((user) => {
+    console.log(user); // { id: -1 }
+
+    waiting = false;
+
+    service.fetchUser().then((u) => {
+      console.log(u); // { id: 1 }
+      asyncUntilMock.restore();
+    });
+  });
+
+  // ---- until(): combined with onCall and times ----
+  let pending = true;
+
+  const complexMock = mock(service, "getUser")
+    .onCall(1)
+    .returns({ id: 100 }) // highest priority
+    .times(2)
+    .returns({ id: -2 }) // next priority
+    .until(() => pending)
+    .returns({ id: -1 })
+    .returns({ id: 1 });
+
+  console.log(service.getUser()); // { id: 100 } (onCall)
+  console.log(service.getUser()); // { id: -2 }  (times)
+  console.log(service.getUser()); // { id: -2 }  (times)
+  console.log(service.getUser()); // { id: -1 }  (until)
+
+  pending = false;
+
+  console.log(service.getUser()); // { id: 1 }   (fallback)
+
+  complexMock.restore();
 });

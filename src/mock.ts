@@ -1,7 +1,13 @@
 import { registerRestore, unregisterRestore } from "./restoreAll";
+import {
+  createUntilState,
+  applyUntil,
+  shouldApplyUntil,
+  resetUntil,
+  type UntilState,
+} from "./until";
 
 export function mock<T extends object, K extends keyof T>(target: T, key: K) {
-  // Save original method
   const original = target[key];
 
   if (typeof original !== "function") {
@@ -21,14 +27,18 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
   let timesRemaining: number | null = null;
   let timesImplementation: ((...args: any[]) => any) | null = null;
 
-  // onCall (by call index)
+  // onCall
   const onCallMap = new Map<number, (...args: any[]) => any>();
 
-  // pending mode (consumed by next returns / throws / resolves)
+  // until (delegated to until.ts)
+  let untilState: UntilState | null = null;
+
+  // pending mode
   type PendingMode =
     | { type: "once" }
     | { type: "times"; count: number }
     | { type: "onCall"; index: number }
+    | { type: "until" }
     | null;
 
   let pendingMode: PendingMode = null;
@@ -58,17 +68,19 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
     // once
     if (onceImplementation) {
       const fn = onceImplementation;
-
       onceImplementation = null;
-
       return fn.apply(this, args);
     }
 
     // times
     if (timesRemaining !== null && timesRemaining > 0 && timesImplementation) {
       timesRemaining--;
-
       return timesImplementation.apply(this, args);
+    }
+
+    // until
+    if (untilState && shouldApplyUntil(untilState)) {
+      return applyUntil(untilState, args);
     }
 
     // withArgs
@@ -84,7 +96,6 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
 
   target[key] = mocker as T[K];
 
-  // stable restore function (used by restoreAll)
   const restoreFn = () => {
     target[key] = original;
   };
@@ -92,36 +103,33 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
   registerRestore(restoreFn);
 
   return {
-    // apply once
     once() {
       pendingMode = { type: "once" };
-
       return this;
     },
 
-    // apply N times
     times(n: number) {
       if (!Number.isInteger(n) || n <= 0) {
         throw new Error("times(n) expects a positive integer");
       }
-
       pendingMode = { type: "times", count: n };
-
       return this;
     },
 
-    // apply on specific call index (1-based)
     onCall(n: number) {
       if (!Number.isInteger(n) || n <= 0) {
         throw new Error("onCall(n) expects a positive integer");
       }
-
       pendingMode = { type: "onCall", index: n };
-
       return this;
     },
 
-    // argument-based behavior
+    until(predicate: () => boolean, maxCalls?: number) {
+      untilState = createUntilState(predicate, maxCalls ?? null);
+      pendingMode = { type: "until" };
+      return this;
+    },
+
     withArgs(...expectedArgs: any[]) {
       return {
         returns: (value: any) => {
@@ -129,7 +137,6 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
             args: expectedArgs,
             impl: () => value,
           });
-
           return this;
         },
 
@@ -140,7 +147,6 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
               throw error;
             },
           });
-
           return this;
         },
 
@@ -149,13 +155,11 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
             args: expectedArgs,
             impl: () => Promise.resolve(value),
           });
-
           return this;
         },
       };
     },
 
-    // return value
     returns(value: any) {
       if (pendingMode?.type === "onCall") {
         onCallMap.set(pendingMode.index, () => value);
@@ -167,44 +171,45 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
         timesRemaining = pendingMode.count;
         timesImplementation = () => value;
         pendingMode = null;
+      } else if (pendingMode?.type === "until" && untilState) {
+        untilState.impl = () => value;
+        pendingMode = null;
       } else {
         implementation = () => value;
       }
-
       return this;
     },
 
-    // throw error
     throws(error: Error) {
       if (pendingMode?.type === "onCall") {
         onCallMap.set(pendingMode.index, () => {
           throw error;
         });
-
         pendingMode = null;
       } else if (pendingMode?.type === "once") {
         onceImplementation = () => {
           throw error;
         };
-
         pendingMode = null;
       } else if (pendingMode?.type === "times") {
         timesRemaining = pendingMode.count;
         timesImplementation = () => {
           throw error;
         };
-
+        pendingMode = null;
+      } else if (pendingMode?.type === "until" && untilState) {
+        untilState.impl = () => {
+          throw error;
+        };
         pendingMode = null;
       } else {
         implementation = () => {
           throw error;
         };
       }
-
       return this;
     },
 
-    // resolve promise
     resolves(value: any) {
       if (pendingMode?.type === "onCall") {
         onCallMap.set(pendingMode.index, () => Promise.resolve(value));
@@ -216,17 +221,19 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
         timesRemaining = pendingMode.count;
         timesImplementation = () => Promise.resolve(value);
         pendingMode = null;
+      } else if (pendingMode?.type === "until" && untilState) {
+        untilState.impl = () => Promise.resolve(value);
+        pendingMode = null;
       } else {
         implementation = () => Promise.resolve(value);
       }
-
       return this;
     },
 
-    // reset internal state (keep mock active)
     reset() {
       callCount = 0;
       callArgs.length = 0;
+
       onceImplementation = null;
       timesRemaining = null;
       timesImplementation = null;
@@ -234,20 +241,19 @@ export function mock<T extends object, K extends keyof T>(target: T, key: K) {
 
       onCallMap.clear();
 
+      if (untilState) resetUntil(untilState);
+
       return this;
     },
 
-    // number of calls
     called() {
       return callCount;
     },
 
-    // arguments of each call
     calledArgs() {
       return callArgs.slice();
     },
 
-    // restore original method
     restore() {
       restoreFn();
       unregisterRestore(restoreFn);
